@@ -23,4 +23,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.AddCommand(day1Round1Cmd)
 	rootCmd.AddCommand(day1Round2Cmd)
+	rootCmd.AddCommand(day2Round1Cmd)
+	rootCmd.AddCommand(day2Round2Cmd)
 }
