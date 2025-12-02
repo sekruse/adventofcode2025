@@ -9,7 +9,7 @@ func TestResults(t *testing.T) {
 	testFilePath := filepath.Join("testdata", "example.txt")
 	t.Run("Round 1", func(t *testing.T) {
 		const want = 1227775554
-		got, err := Round1(testFilePath, true)
+		got, err := Round1(testFilePath, false)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -18,8 +18,8 @@ func TestResults(t *testing.T) {
 		}
 	})
 	t.Run("Round 2", func(t *testing.T) {
-		const want = 6
-		got, err := Round2(testFilePath, false)
+		const want = 4174379265
+		got, err := Round2(testFilePath, true)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}

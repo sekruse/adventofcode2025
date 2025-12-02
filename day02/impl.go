@@ -113,8 +113,89 @@ func split(n int64) (prefix, suffix int64) {
 	return prefix, suffix
 }
 
-func Round2(path string, verbose bool) (int, error) {
-	return 0, fmt.Errorf("not implemented")
+func Round2(path string, verbose bool) (int64, error) {
+	intervals, err := LoadIntervals(path)
+	if err != nil {
+		return 0, err
+	}
+	var sum int64
+	for _, interval := range intervals {
+		elis := splitIntoEquilengthIntervals(interval)
+		if verbose {
+			fmt.Printf("Split %s into: %s\n", interval, elis)
+		}
+		for _, eli := range elis {
+			// Step 2: Iterate all possible token lengths (divisible by interval length).
+			width := len(fmt.Sprintf("%d", eli.A))
+			for tokenLen := 1; tokenLen <= width/2; tokenLen++ {
+				if width%tokenLen != 0 {
+					continue
+				}
+				var tokenSum int64
+				// Step 3: Test the lowest possible invalid ID, e.g., starting from 123456 and token length 2, test 12 12 12.
+				tokenA := eli.A / exp(width-tokenLen)
+				patternA := createPattern(tokenA, tokenLen, width/tokenLen)
+				if patternA >= eli.A && patternA <= eli.B {
+					if verbose {
+						fmt.Printf("Adding start pattern in %s for token length %d: %d times %d = %d\n", eli, tokenLen, width/tokenLen, tokenA, patternA)
+					}
+					tokenSum += tokenA
+				}
+				// Step 4: Test the lowest possible invalid ID, e.g., ending at 153344 and token length 2, test 15 15 15
+				tokenB := eli.B / exp(width-tokenLen)
+				patternB := createPattern(tokenB, tokenLen, width/tokenLen)
+				if tokenA < tokenB && patternB >= eli.A && patternB <= eli.B {
+					if verbose {
+						fmt.Printf("End pattern in %s for token length %d: %d times %d = %d\n", eli, tokenLen, width/tokenLen, tokenB, patternB)
+					}
+					tokenSum += tokenB
+				}
+				// Step 5: Sum up all possible invalid IDs in between the two above, e.g., 13 13 13 and 14 14 14.
+				// We can again use Gauss's trick along with repeated summing and multiplication.
+				innerTokens := tokenB - tokenA - 1
+				if innerTokens > 0 {
+					if verbose {
+						fmt.Printf("Adding %d more inner patterns between %d and %d\n", innerTokens, patternA, patternB)
+					}
+					tokenSum += innerTokens*(innerTokens+1)/2 + innerTokens*tokenA
+				}
+				// Since the pattern creation algorithm is linear for constant token lenghts and reps, we can use it to compute the pattern sum from the token sum.
+				sum += createPattern(tokenSum, tokenLen, width/tokenLen)
+			}
+		}
+	}
+	return sum, nil
+}
+
+// splitIntoEquilengthIntervals splits the given interval into smallest number of consecutive intervals
+// such that the start and end of the interval have the same number of digits.
+func splitIntoEquilengthIntervals(in *Interval) []*Interval {
+	sa := fmt.Sprintf("%d", in.A)
+	sb := fmt.Sprintf("%d", in.B)
+	if len(sa) == len(sb) {
+		return []*Interval{in}
+	}
+	var res []*Interval
+	start := in.A
+	end := exp(len(sa)) - 1
+	for start <= in.B {
+		res = append(res, &Interval{A: start, B: end})
+		start = end + 1
+		end = start * 10
+		if end > in.B {
+			end = in.B
+		}
+	}
+	return res
+}
+
+func createPattern(token int64, tokenLen, reps int) int64 {
+	repFactor := exp(tokenLen)
+	var res int64
+	for i := 0; i < reps; i++ {
+		res = repFactor*res + token
+	}
+	return res
 }
 
 type Interval struct {
