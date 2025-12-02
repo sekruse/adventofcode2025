@@ -127,11 +127,12 @@ func Round2(path string, verbose bool) (int64, error) {
 		for _, eli := range elis {
 			// Step 2: Iterate all possible token lengths (divisible by interval length).
 			width := len(fmt.Sprintf("%d", eli.A))
+			// Deduplicate patterns, such as 2222 that would be found at token lengths 1 and 2
+			invalidIDs := make(map[int64]struct{})
 			for tokenLen := 1; tokenLen <= width/2; tokenLen++ {
 				if width%tokenLen != 0 {
 					continue
 				}
-				var tokenSum int64
 				// Step 3: Test the lowest possible invalid ID, e.g., starting from 123456 and token length 2, test 12 12 12.
 				tokenA := eli.A / exp(width-tokenLen)
 				patternA := createPattern(tokenA, tokenLen, width/tokenLen)
@@ -139,7 +140,7 @@ func Round2(path string, verbose bool) (int64, error) {
 					if verbose {
 						fmt.Printf("Adding start pattern in %s for token length %d: %d times %d = %d\n", eli, tokenLen, width/tokenLen, tokenA, patternA)
 					}
-					tokenSum += tokenA
+					invalidIDs[patternA] = struct{}{}
 				}
 				// Step 4: Test the lowest possible invalid ID, e.g., ending at 153344 and token length 2, test 15 15 15
 				tokenB := eli.B / exp(width-tokenLen)
@@ -148,19 +149,21 @@ func Round2(path string, verbose bool) (int64, error) {
 					if verbose {
 						fmt.Printf("End pattern in %s for token length %d: %d times %d = %d\n", eli, tokenLen, width/tokenLen, tokenB, patternB)
 					}
-					tokenSum += tokenB
+					invalidIDs[patternB] = struct{}{}
 				}
-				// Step 5: Sum up all possible invalid IDs in between the two above, e.g., 13 13 13 and 14 14 14.
-				// We can again use Gauss's trick along with repeated summing and multiplication.
-				innerTokens := tokenB - tokenA - 1
-				if innerTokens > 0 {
+				// Step 5: Collect all possible invalid IDs in between the two above, e.g., 13 13 13 and 14 14 14.
+				if tokenB-tokenA > 1 {
 					if verbose {
-						fmt.Printf("Adding %d more inner patterns between %d and %d\n", innerTokens, patternA, patternB)
+						fmt.Printf("Adding %d more inner patterns between %d and %d\n", tokenB-tokenA-1, patternA, patternB)
 					}
-					tokenSum += innerTokens*(innerTokens+1)/2 + innerTokens*tokenA
+					for innerToken := tokenA + 1; innerToken < tokenB; innerToken++ {
+						invalidIDs[createPattern(innerToken, tokenLen, width/tokenLen)] = struct{}{}
+					}
 				}
-				// Since the pattern creation algorithm is linear for constant token lenghts and reps, we can use it to compute the pattern sum from the token sum.
-				sum += createPattern(tokenSum, tokenLen, width/tokenLen)
+			}
+			// Commit the IDs to the sum after the entire interval has been processed.
+			for invalidID := range invalidIDs {
+				sum += invalidID
 			}
 		}
 	}

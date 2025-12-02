@@ -19,7 +19,7 @@ func TestResults(t *testing.T) {
 	})
 	t.Run("Round 2", func(t *testing.T) {
 		const want = 4174379265
-		got, err := Round2(testFilePath, true)
+		got, err := Round2(testFilePath, false)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
