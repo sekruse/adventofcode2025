@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	dialInit      int = 50
-	dialPositions int = 100
-)
-
 func Round1(path string, verbose bool) (int64, error) {
 	intervals, err := LoadIntervals(path)
 	if err != nil {
