@@ -3,16 +3,16 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/sekruse/adventofcode2025/day07"
+	"github.com/sekruse/adventofcode2025/day06"
 	"github.com/spf13/cobra"
 )
 
-var day7Round1Cmd = &cobra.Command{
-	Use:   "d07r1",
-	Short: "Part 1 of day 7.",
+var day6Round1Cmd = &cobra.Command{
+	Use:   "d06r1",
+	Short: "Part 1 of day 6.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		res, err := day07.Round1(args[0], verbose)
+		res, err := day06.Round1(args[0], verbose)
 		if err != nil {
 			return err
 		}
@@ -21,12 +21,12 @@ var day7Round1Cmd = &cobra.Command{
 	},
 }
 
-var day7Round2Cmd = &cobra.Command{
-	Use:   "d07r2",
-	Short: "Part 2 of day 7.",
+var day6Round2Cmd = &cobra.Command{
+	Use:   "d06r2",
+	Short: "Part 2 of day 6.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		res, err := day07.Round2(args[0], verbose)
+		res, err := day06.Round2(args[0], verbose)
 		if err != nil {
 			return err
 		}
