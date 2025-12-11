@@ -60,49 +60,63 @@ func Round2(path string, verbose bool) (int, error) {
 		return 0, err
 	}
 	var res int
+	type state struct {
+		presses int
+		pressVector Vector
+		joltage Vector
+		distance float64
+	}
+	Machines:
 	for _, m := range machines {
 		if verbose {
 			fmt.Printf("Trying to meet the following joltage requirements: %s\n", m.joltageRequirements)
 		}
-		slices.SortFunc(m.buttons, func(a, b Bitset) int { return b.Cardinality() - a.Cardinality() })
-		presses, ok := meetJoltageRequirements(m, 0, NewVector(m.width), m.joltageRequirements, NewVector(len(m.buttons)), verbose)
-		if !ok {
-			return 0, fmt.Errorf("could not find button presses")
+		initState := &state {
+				presses: 0,
+				pressVector: NewVector(len(m.buttons2)),
+				joltage: NewVector(m.width),
+			}
+		initState.distance, _ = initState.joltage.Distance(m.joltageRequirements)
+		states := []*state{initState}
+		shortestLeadUps := make(map[string]int)
+		for len(states) > 0 {
+			// Pop the top state.
+			s := states[len(states)-1]
+			states = states[:len(states)-1]
+			for ib, b := range m.buttons2 {
+				next := &state{
+					presses: s.presses+1,
+					pressVector: slices.Clone(s.pressVector),
+					joltage: s.joltage.Add(b),
+				}
+				next.pressVector[ib] += 1
+				dist, ok := next.joltage.Distance(m.joltageRequirements)
+				if !ok {
+					continue
+				}
+				if dist == 0 {
+					fmt.Printf("Solution for %+v:\n\t%v\n", m, next) 
+					res += next.presses
+					continue Machines
+				}
+				key := next.joltage.String()
+				slu, ok := shortestLeadUps[key]
+				if ok && slu <= next.presses {
+					continue
+				}
+				shortestLeadUps[key] = next.presses
+				next.distance = dist
+				states = append(states, next)
+			}
+			slices.SortFunc(states, func(a, b *state) int {
+				if b.distance < a.distance { return -1 }
+				if b.distance > a.distance { return 1 }
+				return 0	
+			})
 		}
-		res += presses
-		break
+		return 0, fmt.Errorf("did not find any solution for %+v", m)
 	}
 	return res, nil
-}
-
-func meetJoltageRequirements(m *Machine, button int, v, req, pv Vector, verbose bool) (int, bool) {
-	if button >= len(m.buttons) {
-		return 0, false
-	}
-	var buttonPresses int
-	var totalPresses []int
-	for {
-		fmt.Printf("Presses: %s, joltage: %s\n", pv, v)
-		eq, oob := v.Compare(req)
-		if eq {
-			totalPresses = append(totalPresses, buttonPresses)
-		}
-		if eq || oob {
-			break
-		}
-		p, ok := meetJoltageRequirements(m, button + 1, v, req, pv, verbose)
-		if ok {
-			totalPresses = append(totalPresses, p + buttonPresses)
-		}
-		buttonPresses++
-		pv[button]++
-		v = v.Add(m.buttons2[button])
-	}
-	if len(totalPresses) == 0 {
-		return 0, false
-	}
-	slices.Sort(totalPresses)
-	return totalPresses[0], true
 }
 
 type Bitset int64
@@ -168,6 +182,20 @@ func (v Vector) Compare(w Vector) (eq, oob bool) {
 	}
 	return eq, oob
 }
+
+func (v Vector) Distance(w Vector) (dist float64, ok bool) {
+	l := minLen(v, w)
+	for i := 0; i < l; i++ {
+		d := float64(w[i] - v[i])
+		if d < 0 {
+			return -1, false
+		}
+		dist += d * d
+	}
+	return dist, true
+}
+
+
 
 func (v Vector) String() string {
 	return fmt.Sprintf("% d", v)

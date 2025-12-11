@@ -41,4 +41,6 @@ func init() {
 	rootCmd.AddCommand(day9Round2Cmd)
 	rootCmd.AddCommand(day10Round1Cmd)
 	rootCmd.AddCommand(day10Round2Cmd)
+	rootCmd.AddCommand(day11Round1Cmd)
+	rootCmd.AddCommand(day11Round2Cmd)
 }
