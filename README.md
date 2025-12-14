@@ -17,6 +17,8 @@ My attempt at cracking the Advent of Code 2025 puzzles.
   * Round 1 is straight forward. Round 2 has some tricky edge cases that are not featured in the example data. In particular, the actual output data has codes with full revolutions.
 * Day 9:
   * I thought I was being smart about how I check only the perimeter and use the concept of orientation along with linear algebra to detect when we step out of bounds. But the algorithm was still taking a few minutes. I suspect we could prune pairs of red tiles based on where previous candidate checks went out of bounds.
+* Day 10:
+  * Round 2 is still not as fast as I would like it to be. It does an exhaustive search of possible button presses now. I'm wondering if a greedy solution would also produce the right solution. Then, instead of attempting to shrink the search space as quickly as possible, we could prioritize pressing the button with the most wires (which make a single button press most effective).
 * Day 12:
   * Every solution for round 1 can be trivially tranformed into another solution by mirroring it vertically and/or horizontally. So we could start building a solution into one direction.
   * Shapes can have various symmetries: horizontally, diagonally (2x), vertically, rotational (90 and 180 degrees). Detecting those prunes the search space considerably.

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -60,69 +61,119 @@ func Round2(path string, verbose bool) (int, error) {
 		return 0, err
 	}
 	var res int
-	type state struct {
-		presses int
-		pressVector Vector
-		joltage Vector
-		distance float64
-	}
-	Machines:
 	for _, m := range machines {
-		if verbose {
-			fmt.Printf("Trying to meet the following joltage requirements: %s\n", m.joltageRequirements)
+		presses, ok := minPressesForJoltageRequirements(m, verbose)
+		if !ok {
+			return 0, fmt.Errorf("could not determine button presses for %+v", m)
 		}
-		initState := &state {
-				presses: 0,
-				pressVector: NewVector(len(m.buttons2)),
-				joltage: NewVector(m.width),
-			}
-		initState.distance, _ = initState.joltage.Distance(m.joltageRequirements)
-		states := []*state{initState}
-		shortestLeadUps := make(map[string]int)
-		for len(states) > 0 {
-			// Pop the top state.
-			s := states[len(states)-1]
-			states = states[:len(states)-1]
-			for ib, b := range m.buttons2 {
-				next := &state{
-					presses: s.presses+1,
-					pressVector: slices.Clone(s.pressVector),
-					joltage: s.joltage.Add(b),
-				}
-				next.pressVector[ib] += 1
-				dist, ok := next.joltage.Distance(m.joltageRequirements)
-				if !ok {
-					continue
-				}
-				if dist == 0 {
-					fmt.Printf("Solution for %+v:\n\t%v\n", m, next) 
-					res += next.presses
-					continue Machines
-				}
-				key := next.joltage.String()
-				slu, ok := shortestLeadUps[key]
-				if ok && slu <= next.presses {
-					continue
-				}
-				shortestLeadUps[key] = next.presses
-				next.distance = dist
-				states = append(states, next)
-			}
-			slices.SortFunc(states, func(a, b *state) int {
-				if b.distance < a.distance { return -1 }
-				if b.distance > a.distance { return 1 }
-				return 0	
-			})
-		}
-		return 0, fmt.Errorf("did not find any solution for %+v", m)
+		res += presses
 	}
 	return res, nil
+}
+
+func minPressesForJoltageRequirements(m *Machine, verbose bool) (int, bool) {
+	type comboCount struct {
+		index        int
+		combinations int
+	}
+	var combos []comboCount
+	buttonsByLevel := make([][]Vector, m.width)
+	if verbose {
+		fmt.Printf("Trying to meet the following joltage requirements: %s\n", m.joltageRequirements)
+	}
+	for i := 0; i < m.width; i++ {
+		if m.joltageRequirements[i] == 0 {
+			continue
+		}
+		// Count the number of buttons wired to this level.
+	Buttons:
+		for _, b := range m.buttons2 {
+			if b[i] == 0 {
+				continue Buttons
+			}
+			for j, v := range b {
+				if v > m.joltageRequirements[j] {
+					continue Buttons
+				}
+			}
+			buttonsByLevel[i] = append(buttonsByLevel[i], b)
+		}
+		// Calculate how many combinations of button presses would lead to the desired joltage level.
+		if len(buttonsByLevel[i]) == 0 {
+			return 0, false
+		}
+		combinations := 1
+		for b := 2; b <= len(buttonsByLevel[i]); b++ {
+			combinations *= (m.joltageRequirements[i] + b - 1)
+			combinations /= (b - 1)
+		}
+		if verbose {
+			fmt.Printf(
+				"Joltage requirement %d is set to %d and is wired to %d buttons. So there are %d combinations for it.\n",
+				i, m.joltageRequirements[i], len(buttonsByLevel[i]), combinations)
+		}
+		combos = append(combos, comboCount{
+			index:        i,
+			combinations: combinations,
+		})
+	}
+	// If there's no more combos, we're done.
+	if len(combos) == 0 {
+		return 0, true
+	}
+	// Pick the joltage level with the fewest options to set it.
+	slices.SortFunc(combos, func(a, b comboCount) int {
+		return a.combinations - b.combinations
+	})
+	i := combos[0].index
+	buttons := buttonsByLevel[i]
+	if verbose {
+		fmt.Printf("Picked joltage requirement %d for which there are %d combinations with %d buttons\n", i, combos[0].combinations, len(buttons))
+	}
+	time.Sleep(0 * time.Second)
+	// Iterate all options to reach the joltage level at index i.
+	var found bool
+	var minPresses int
+Candidates:
+	for p := range Partitions(m.joltageRequirements[i], len(buttons)) {
+		if verbose {
+			fmt.Printf("Pressing the following buttons:")
+			for k, c := range p {
+				fmt.Printf(" %dx % v", c, buttons[k])
+			}
+			fmt.Println()
+		}
+		mPrime := m.Clone()
+		for b, times := range p {
+			mPrime.joltageRequirements = mPrime.joltageRequirements.Add(buttons[b].Scale(-times))
+		}
+		// Check that this option is valid and didn't overshoot on any other joltage requirements.
+		for _, jr := range mPrime.joltageRequirements {
+			if jr < 0 {
+				continue Candidates
+			}
+		}
+		// Recursively run this algorithm on the remaining unmet joltage requirements.
+		presses, ok := minPressesForJoltageRequirements(mPrime, verbose)
+		if !ok {
+			continue
+		}
+		if !found || presses+m.joltageRequirements[i] < minPresses {
+			found = true
+			minPresses = presses + m.joltageRequirements[i]
+		}
+	}
+	return minPresses, found
 }
 
 type Bitset int64
 
 func (b Bitset) Set(i int) Bitset {
 	return b | (1 << i)
+}
+
+func (b Bitset) Has(i int) bool {
+	return (b & (1 << i)) != 0
 }
 
 func (b Bitset) Xor(c Bitset) Bitset {
@@ -132,12 +183,12 @@ func (b Bitset) Xor(c Bitset) Bitset {
 func (b Bitset) Cardinality() int {
 	var c int
 	for b != 0 {
-		if b & 1 == 1 {
+		if b&1 == 1 {
 			c++
 		}
 		b = b >> 1
 	}
-return c
+	return c
 }
 
 func (b Bitset) String() string {
@@ -162,6 +213,14 @@ func (v Vector) Add(w Vector) Vector {
 	res := make([]int, l)
 	for i := 0; i < l; i++ {
 		res[i] = v[i] + w[i]
+	}
+	return res
+}
+
+func (v Vector) Scale(scalar int) Vector {
+	res := make([]int, len(v))
+	for i := 0; i < len(v); i++ {
+		res[i] = v[i] * scalar
 	}
 	return res
 }
@@ -195,8 +254,6 @@ func (v Vector) Distance(w Vector) (dist float64, ok bool) {
 	return dist, true
 }
 
-
-
 func (v Vector) String() string {
 	return fmt.Sprintf("% d", v)
 }
@@ -205,8 +262,18 @@ type Machine struct {
 	width               int
 	lights              Bitset
 	buttons             []Bitset
-	buttons2 []Vector
+	buttons2            []Vector
 	joltageRequirements Vector
+}
+
+func (m *Machine) Clone() *Machine {
+	return &Machine{
+		width:               m.width,
+		lights:              m.lights,
+		buttons:             m.buttons,
+		buttons2:            m.buttons2,
+		joltageRequirements: m.joltageRequirements,
+	}
 }
 
 func ParseMachine(line string) (*Machine, error) {
@@ -276,6 +343,23 @@ func LoadMachines(path string) ([]*Machine, error) {
 		return nil, err
 	}
 	return machines, nil
+}
+
+func Partitions(sum int, parts int) iter.Seq[[]int] {
+	if parts == 1 {
+		return func(yield func([]int) bool) {
+			yield([]int{sum})
+		}
+	}
+	return func(yield func([]int) bool) {
+		for i := 0; i <= sum; i++ {
+			for p := range Partitions(sum-i, parts-1) {
+				if !yield(append(p[:], i)) {
+					return
+				}
+			}
+		}
+	}
 }
 
 func Cube(n, dim int) iter.Seq[[]int] {
